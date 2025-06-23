@@ -23,7 +23,13 @@ with DAG(
     # data pipeline
 
     # --- label store ---
-    dep_check_source_label_data = DummyOperator(task_id="dep_check_source_label_data")
+    dep_check_source_label_data = BashOperator(
+        task_id='dep_check_source_label_data',
+        bash_command=(
+            'cd /opt/airflow/scripts && '
+            'python3 check_source_label.py'
+        ),
+    )
 
     bronze_label_store = BashOperator(
         task_id='run_bronze_label',
@@ -52,16 +58,35 @@ with DAG(
         ),
     )
 
-    label_store_completed = DummyOperator(task_id="label_store_completed")
+    label_store_completed = BashOperator(
+        task_id='label_store_completed',
+        bash_command=(
+            'cd /opt/airflow/scripts && '
+            'python3 check_label_store_completed.py'
+        ),
+    )
+    
 
     # Define task dependencies to run scripts sequentially
     dep_check_source_label_data >> bronze_label_store >> silver_label_store >> gold_label_store >> label_store_completed
  
  
     # --- feature store ---
-    dep_check_source_data_bronze_feature = DummyOperator(task_id="dep_check_source_data_bronze_feature")
+    dep_check_source_data_bronze_feature = BashOperator(
+        task_id='check_source_data_bronze_feature',
+        bash_command=(
+            'cd /opt/airflow/scripts && '
+            'python3 check_bronze_feature.py'
+        ),
+    )
 
-    dep_check_source_data_bronze_meta = DummyOperator(task_id="dep_check_source_data_bronze_meta")
+    dep_check_source_data_bronze_meta = BashOperator(
+        task_id='check_source_data_bronze_meta',
+        bash_command=(
+            'cd /opt/airflow/scripts && '
+            'python3 check_bronze_meta.py'
+        ),
+    )
 
 
     bronze_feature = BashOperator(
@@ -110,7 +135,14 @@ with DAG(
         ),
     )
 
-    feature_store_completed = DummyOperator(task_id="feature_store_completed")
+    feature_store_completed = BashOperator(
+        task_id='feature_store_completed',
+        bash_command=(
+            'cd /opt/airflow/scripts && '
+            'python3 check_gold_feature.py'
+        ),
+    )
+    
     
     # Define task dependencies to run scripts sequentially
     dep_check_source_data_bronze_feature >> bronze_feature >> silver_feature >> gold_feature_store
