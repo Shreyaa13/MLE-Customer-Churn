@@ -186,7 +186,14 @@ with DAG(
     
     model_1_automl = DummyOperator(task_id="model_1_automl")
 
-    model_2_automl = DummyOperator(task_id="model_2_automl")
+    model_2_automl = BashOperator(
+        task_id='model_2_automl_xgboost',
+        bash_command=(
+            'cd /opt/airflow/scripts && '
+            'python3 train_xgboost_model.py '
+            '--model_train_date "{{ ds }}"'
+        ),
+    )
 
     model_automl_completed = DummyOperator(task_id="model_automl_completed")
     
