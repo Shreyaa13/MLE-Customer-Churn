@@ -102,10 +102,6 @@ def main(snapshotdate, modelname):
         median_val = features_pdf[num_col].median()
         features_pdf[num_col] = features_pdf[num_col].fillna(median_val)
 
-    # for cat_col in categorical_cols:
-    #     mode_val = features_pdf[cat_col].mode()[0] if not features_pdf[cat_col].mode().empty else "Unknown"
-    #     features_pdf[cat_col] = features_pdf[cat_col].fillna(mode_val)
-
     for cat_col in categorical_cols:
         if pd.api.types.is_categorical_dtype(features_pdf[cat_col]):
             if "Unknown" not in features_pdf[cat_col].cat.categories:
@@ -114,15 +110,7 @@ def main(snapshotdate, modelname):
         features_pdf[cat_col] = features_pdf[cat_col].fillna(mode_val)
 
 
-
     # --- model prediction inference ---
-
-    # Load pipeline
-    # with open(config["model_artefact_filepath"], 'rb') as f:
-    # obj = pickle.load(f)
-    
-    # preprocessor = pipeline['preprocessor']
-    # model = pipeline['model']
 
     # Transform and predict
     X_inference = preprocessor.transform(features_pdf)
@@ -134,7 +122,6 @@ def main(snapshotdate, modelname):
     
     print(y_inference_pdf.head())
     print("Number of predictions:", len(y_inference_pdf))
-
 
 
     # --- save model inference to datamart gold table ---
