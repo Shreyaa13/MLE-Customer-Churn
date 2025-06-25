@@ -165,15 +165,30 @@ def train_model(model_train_date_str):
         print(f"Best Parameters: {random_search.best_params_}")
 
         # --- 6. Save Model Artifact ---
+
+        # import joblib
         artifact_path = 'model_artifacts'
         os.makedirs(artifact_path, exist_ok=True)
-        
+
         pipeline_to_save = {'preprocessor': preprocessor, 'model': best_xgb}
+
+        joblib.dump(pipeline_to_save, f'{artifact_path}/xgb_model_pipeline.joblib')
+
+        print(f"XGBoost model pipeline saved to {artifact_path}/xgb_model_pipeline.joblib")
+
+
+
+        # artifact_path = 'model_artifacts'
+        # os.makedirs(artifact_path, exist_ok=True)
         
-        with open(f'{artifact_path}/xgb_model_pipeline.pkl', 'wb') as f:
-            pickle.dump(pipeline_to_save, f)
+        # pipeline_to_save = {'preprocessor': preprocessor, 'model': best_xgb}
+        
+        # with open(f'{artifact_path}/xgb_model_pipeline.pkl', 'wb') as f:
+        #     pickle.dump(pipeline_to_save, f)
             
-        print(f"XGBoost model pipeline saved to {artifact_path}/xgb_model_pipeline.pkl")
+        # print(f"XGBoost model pipeline saved to {artifact_path}/xgb_model_pipeline.pkl")
+
+
     except Exception as e:
         print(e)
 

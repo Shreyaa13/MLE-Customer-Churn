@@ -153,9 +153,29 @@ with DAG(
     # --- model inference ---
     model_inference_start = DummyOperator(task_id="model_inference_start")
 
-    model_1_inference = DummyOperator(task_id="model_inference_xgb")
+    model_1_inference = BashOperator(
+        task_id='model_1_inference',
+        bash_command=(
+            'cd /opt/airflow/scripts && '
+            'python3 model_inference_xgb.py '
+            '--snapshotdate "{{ ds }}" '
+            '--modelname "xgb_model_pipeline.pkl"'
+        ),
+    )
 
-    model_2_inference = DummyOperator(task_id="model_inference_LR")
+    model_2_inference = DummyOperator(task_id="model_2_inference")
+    
+    
+    # BashOperator(
+    #     task_id='model_2_inference',
+    #     bash_command=(
+    #         'cd /opt/airflow/scripts && '
+    #         'python3 model_inference_LR.py '
+    #         '--snapshotdate "{{ ds }}" '
+    #         '--modelname "log_reg_churn_model.joblib"'
+    #     ),
+    # )
+
 
     model_inference_completed = DummyOperator(task_id="model_inference_completed")
     
