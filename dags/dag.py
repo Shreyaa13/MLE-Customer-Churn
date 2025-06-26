@@ -154,7 +154,7 @@ with DAG(
     model_inference_start = DummyOperator(task_id="model_inference_start")
 
     model_1_inference = BashOperator(
-        task_id='model_1_inference',
+        task_id='xgb_inference',
         bash_command=(
             'cd /opt/airflow/scripts && '
             'python3 model_inference_xgb.py '
@@ -163,51 +163,35 @@ with DAG(
         ),
     )
 
-    model_2_inference = DummyOperator(task_id="model_2_inference")
     
     
-    # BashOperator(
-    #     task_id='model_2_inference',
-    #     bash_command=(
-    #         'cd /opt/airflow/scripts && '
-    #         'python3 model_inference_LR.py '
-    #         '--snapshotdate "{{ ds }}" '
-    #         '--modelname "log_reg_churn_model.joblib"'
-    #     ),
-    # )
-
-
     model_inference_completed = DummyOperator(task_id="model_inference_completed")
     
     # Define task dependencies to run scripts sequentially
     feature_store_completed >> model_inference_start
     model_inference_start >> model_1_inference >> model_inference_completed
-    model_inference_start >> model_2_inference >> model_inference_completed
 
 
     # --- model monitoring ---
     model_monitor_start = DummyOperator(task_id="model_monitor_start")
 
-    model_1_monitor = DummyOperator(task_id="model_1_monitor")
+    model_1_monitor = DummyOperator(task_id="xgb_monitor")
 
-    model_2_monitor = DummyOperator(task_id="model_2_monitor")
 
     model_monitor_completed = DummyOperator(task_id="model_monitor_completed")
     
     # Define task dependencies to run scripts sequentially
     model_inference_completed >> model_monitor_start
     model_monitor_start >> model_1_monitor >> model_monitor_completed
-    model_monitor_start >> model_2_monitor >> model_monitor_completed
 
 
     # --- model auto training ---
 
     model_automl_start = DummyOperator(task_id="model_automl_start")
     
-    model_1_automl = DummyOperator(task_id="model_1_automl")
 
-    model_2_automl = BashOperator(
-        task_id='model_2_automl_xgboost',
+    model_1_automl = BashOperator(
+        task_id='automl_xgboost',
         bash_command=(
             'cd /opt/airflow/scripts && '
             'python3 train_xgboost_model.py '
@@ -221,4 +205,3 @@ with DAG(
     feature_store_completed >> model_automl_start
     label_store_completed >> model_automl_start
     model_automl_start >> model_1_automl >> model_automl_completed
-    model_automl_start >> model_2_automl >> model_automl_completed
