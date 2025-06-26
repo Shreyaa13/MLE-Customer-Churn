@@ -7,20 +7,22 @@ USER root
 # Set non-interactive mode for apt-get
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install Java (OpenJDK 17 headless), procps (for 'ps') and bash
+# Install Java and create proper directory structure
 RUN apt-get update && \
     apt-get install -y --no-install-recommends openjdk-17-jdk-headless procps bash && \
     rm -rf /var/lib/apt/lists/* && \
-    # Ensure Spark’s scripts run with bash instead of dash
-    ln -sf /bin/bash /bin/sh
-    #  && \
-    # Create expected JAVA_HOME directory and symlink the java binary there
-    # mkdir -p /usr/lib/jvm/java-17-openjdk-amd64/bin && \
-    # ln -s "$(which java)" /usr/lib/jvm/java-17-openjdk-amd64/bin/java
+    ln -sf /bin/bash /bin/sh && \
+    mkdir -p /usr/lib/jvm/java-17-openjdk-amd64/bin && \
+    ln -sf $(which java) /usr/lib/jvm/java-17-openjdk-amd64/bin/java && \
+    ln -sf $(which javac) /usr/lib/jvm/java-17-openjdk-amd64/bin/javac
 
-# Set JAVA_HOME to the directory expected by Spark
+# Set JAVA_HOME and Spark environment variables
 ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 ENV PATH=$PATH:$JAVA_HOME/bin
+ENV PYSPARK_PYTHON=python3
+ENV PYSPARK_DRIVER_PYTHON=python3
+ENV SPARK_HOME=/home/airflow/.local/lib/python3.7/site-packages/pyspark
+ENV JAVA_OPTS="-Xmx2g -XX:+UseG1GC"
 
 # Set the working directory
 WORKDIR /app

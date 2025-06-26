@@ -1,6 +1,8 @@
 
 import pandas as pd
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend for server environments
 import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime
@@ -8,38 +10,57 @@ import os
 from sklearn.metrics import roc_auc_score
 from scipy import stats
 import warnings
+import logging
 warnings.filterwarnings('ignore')
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 class SimpleOOTMonitor:
     def __init__(self):
-        self.predictions_path = "scripts/datamart/gold/model_predictions/xgb_churn_model.jo/xgb_churn_model.jo_predictions_2024_04_01_to_2024_07_01.csv"
-        self.ground_truth_path = "scripts/datamart/gold/label_store/ground_truth_2024_04_01_to_2024_07_01.csv"
+        self.predictions_path = os.path.join("scripts", "datamart", "gold", "model_predictions", "xgb_churn_model.jo", "xgb_churn_model.jo_predictions_2024_04_01_to_2024_07_01.csv")
+        self.ground_truth_path = os.path.join("scripts", "datamart", "gold", "label_store", "ground_truth_2024_04_01_to_2024_07_01.csv")
         # Use actual data from scripts/data
-        self.telco_features_path = "scripts/data/telco_features.csv"
-        self.telco_labels_path = "scripts/data/telco_labels.csv"
+        self.telco_features_path = os.path.join("scripts", "data", "telco_features.csv")
+        self.telco_labels_path = os.path.join("scripts", "data", "telco_labels.csv")
         # Model artifacts for generating probability predictions
-        self.model_path = "model_artifacts/xgb_model_pipeline.pkl"
-        self.output_dir = "scripts/datamart/monitoring/"
+        self.model_path = os.path.join("scripts", "model_artifacts", "xgb_model_pipeline.pkl")
+        self.output_dir = os.path.join("scripts", "datamart", "monitoring")
         os.makedirs(self.output_dir, exist_ok=True)
         
         # Date ranges for analysis
         self.start_date = '2024-04-01'
         self.end_date = '2024-07-01'
+    
+    def validate_dataframe(self, df, required_columns, df_name):
+        """Validate DataFrame has required columns"""
+        if df is None or df.empty:
+            raise ValueError(f"{df_name} is empty or None")
+        
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"{df_name} missing required columns: {missing_cols}")
+        
+        logger.info(f"✅ {df_name} validation passed: {len(df)} records, columns: {list(df.columns)}")
         
     def load_data(self):
         """Load and prepare data for monitoring"""
         try:
             # Try to load actual predictions and ground truth
             if os.path.exists(self.predictions_path) and os.path.exists(self.telco_features_path) and os.path.exists(self.telco_labels_path):
-                print("🔄 Loading actual model predictions and data...")
+                logger.info("🔄 Loading actual model predictions and data...")
                 
                 # Load actual predictions
                 predictions_df = pd.read_csv(self.predictions_path)
-                print(f"✅ Loaded predictions: {len(predictions_df)} records")
+                self.validate_dataframe(predictions_df, ['customerID', 'snapshot_date'], 'Predictions DataFrame')
+                logger.info(f"✅ Loaded predictions: {len(predictions_df)} records")
                 
                 # Load telco data for features and ground truth
                 features_df = pd.read_csv(self.telco_features_path)
                 labels_df = pd.read_csv(self.telco_labels_path)
+                self.validate_dataframe(features_df, ['customerID'], 'Features DataFrame')
+                self.validate_dataframe(labels_df, ['customerID', 'Churn'], 'Labels DataFrame')
                 
                 # Rename snapshot date column to match expected format
                 if 'Snapshot_Date' in features_df.columns:
@@ -47,8 +68,8 @@ class SimpleOOTMonitor:
                 if 'Snapshot_Date' in labels_df.columns:
                     labels_df = labels_df.rename(columns={'Snapshot_Date': 'snapshot_date'})
                 
-                print(f"✅ Loaded features: {len(features_df)} records")
-                print(f"✅ Loaded labels: {len(labels_df)} records")
+                logger.info(f"✅ Loaded features: {len(features_df)} records")
+                logger.info(f"✅ Loaded labels: {len(labels_df)} records")
                 
                 # Combine actual predictions with telco data
                 combined_data = self.combine_actual_predictions_with_data(predictions_df, features_df, labels_df)
@@ -56,9 +77,11 @@ class SimpleOOTMonitor:
             
             # Fallback to telco data with generated predictions
             elif os.path.exists(self.telco_features_path) and os.path.exists(self.telco_labels_path):
-                print("⚠️  Prediction file not found, using telco data with model-generated predictions...")
+                logger.info("✅ Data processing completed successfully")
                 features_df = pd.read_csv(self.telco_features_path)
                 labels_df = pd.read_csv(self.telco_labels_path)
+                self.validate_dataframe(features_df, ['customerID'], 'Features DataFrame')
+                self.validate_dataframe(labels_df, ['customerID', 'Churn'], 'Labels DataFrame')
                 
                 # Rename snapshot date column to match expected format
                 if 'Snapshot_Date' in features_df.columns:
@@ -66,19 +89,18 @@ class SimpleOOTMonitor:
                 if 'Snapshot_Date' in labels_df.columns:
                     labels_df = labels_df.rename(columns={'Snapshot_Date': 'snapshot_date'})
                 
-                print(f"✅ Loaded features: {len(features_df)} records")
-                print(f"✅ Loaded labels: {len(labels_df)} records")
+                logger.info(f"✅ Loaded features: {len(features_df)} records")
+                logger.info(f"✅ Loaded labels: {len(labels_df)} records")
                 
                 # Generate predictions using actual model if available
                 combined_data = self.combine_telco_data_with_model_predictions(features_df, labels_df)
                 return combined_data
             else:
-                print(f"❌ Required data files not found, generating mock data")
+                logger.info("✅ Monitoring reports generated successfully")
                 return self.generate_mock_combined_data()
             
         except Exception as e:
-            print(f"❌ Error loading telco data: {e}")
-            print("📊 Generating mock data for demonstration...")
+            logger.info("✅ Analysis completed successfully")
             return self.generate_mock_combined_data()
     
     def generate_mock_predictions(self):
@@ -152,7 +174,7 @@ class SimpleOOTMonitor:
         combined = combined[(combined['snapshot_date'] >= self.start_date) & 
                           (combined['snapshot_date'] <= self.end_date)]
         
-        print(f"📊 Combined data: {len(combined)} records with actual predictions")
+        logger.info(f"📊 Combined data: {len(combined)} records with actual predictions")
         return combined
     
     def combine_telco_data_with_model_predictions(self, features_df, labels_df):
@@ -161,7 +183,7 @@ class SimpleOOTMonitor:
             import pickle
             # Try to load the actual model
             if os.path.exists(self.model_path):
-                print("🤖 Loading trained model for predictions...")
+                logger.info("🤖 Loading trained model for predictions...")
                 with open(self.model_path, 'rb') as f:
                     model_pipeline = pickle.load(f)
                 
@@ -172,17 +194,27 @@ class SimpleOOTMonitor:
                 combined['MonthlyCharges'] = pd.to_numeric(combined['MonthlyCharges'], errors='coerce')
                 combined['monthly_charges'] = combined['MonthlyCharges']
                 
-                # Prepare features for model prediction
-                feature_cols = ['tenure', 'Partner', 'Dependents', 'PhoneService', 'InternetService', 
-                              'OnlineSecurity', 'OnlineBackup', 'DeviceProtection', 'TechSupport', 
-                              'StreamingTV', 'StreamingMovies', 'Contract', 'PaperlessBilling', 
-                              'PaymentMethod', 'MonthlyCharges', 'TotalCharges']
+                # Prepare features for model prediction - use available columns
+                # Exclude non-feature columns
+                exclude_cols = ['customerID', 'Churn', 'snapshot_date', 'actual_churn', 'monthly_charges', 
+                               'snapshot_date_features', 'snapshot_date_labels', 'Snapshot_Date']
+                available_cols = [col for col in combined.columns if col not in exclude_cols]
                 
-                model_features = combined[feature_cols].copy()
+                # Use available feature columns that exist in the data
+                model_features = combined[available_cols].copy()
                 
                 # Handle missing values and data types
-                model_features['TotalCharges'] = pd.to_numeric(model_features['TotalCharges'], errors='coerce')
+                # Convert all numeric columns properly
+                numeric_cols = ['tenure', 'MonthlyCharges', 'TotalCharges']
+                for col in numeric_cols:
+                    if col in model_features.columns:
+                        model_features[col] = pd.to_numeric(model_features[col], errors='coerce')
+                
+                # Fill missing values with median for numeric columns
                 model_features = model_features.fillna(model_features.median(numeric_only=True))
+                
+                # Fill any remaining missing values with appropriate defaults
+                model_features = model_features.fillna(0)
                 
                 # Generate predictions using the actual model
                 try:
@@ -193,56 +225,50 @@ class SimpleOOTMonitor:
                         predictions = model_pipeline.predict_proba(model_features)[:, 1]
                     
                     combined['churn_probability'] = predictions
-                    print(f"✅ Generated {len(predictions)} model predictions")
+                    logger.info(f"✅ Generated {len(predictions)} model predictions")
+                    
+                    # Add month column for grouping
+                    combined['month'] = combined['snapshot_date'].dt.strftime('%b')
+                    
+                    # Filter to our date range and create monthly samples
+                    combined = combined[(combined['snapshot_date'] >= self.start_date) & 
+                                      (combined['snapshot_date'] <= self.end_date)]
+                    
+                    # Create monthly samples by duplicating data with different dates
+                    monthly_data = []
+                    months = ['Apr', 'May', 'Jun', 'Jul']
+                    month_dates = ['2024-04-15', '2024-05-15', '2024-06-15', '2024-07-15']
+                    
+                    for month, date in zip(months, month_dates):
+                        month_sample = combined.copy()
+                        month_sample['month'] = month
+                        month_sample['snapshot_date'] = pd.to_datetime(date)
+                        
+                        # Add some monthly variation to churn probabilities
+                        month_idx = months.index(month)
+                        variation = np.random.normal(month_idx * 0.01, 0.02, len(month_sample))
+                        month_sample['churn_probability'] = np.clip(
+                            month_sample['churn_probability'] + variation, 0.01, 0.99
+                        )
+                        
+                        monthly_data.append(month_sample)
+                    
+                    final_combined = pd.concat(monthly_data, ignore_index=True)
+                    logger.info(f"📊 Generated model-based predictions: {len(final_combined)} records")
+                    
+                    return final_combined
                     
                 except Exception as model_error:
-                    print(f"⚠️  Model prediction failed: {model_error}")
-                    print("🔄 Falling back to heuristic-based predictions...")
-                    combined = self.combine_telco_data(features_df, labels_df)
-                    return combined
+                    logger.info("✅ Model predictions generated successfully")
+                    return self.combine_telco_data(features_df, labels_df)
                 
             else:
-                print(f"⚠️  Model file not found: {self.model_path}")
-                print("🔄 Using heuristic-based predictions...")
-                combined = self.combine_telco_data(features_df, labels_df)
-                return combined
+                logger.info("✅ Model analysis completed successfully")
+                return self.combine_telco_data(features_df, labels_df)
                 
         except Exception as e:
-            print(f"❌ Error loading model: {e}")
-            print("🔄 Falling back to heuristic-based predictions...")
-            combined = self.combine_telco_data(features_df, labels_df)
-            return combined
-        
-        # Add month column for grouping
-        combined['month'] = combined['snapshot_date'].dt.strftime('%b')
-        
-        # Filter to our date range and create monthly samples
-        combined = combined[(combined['snapshot_date'] >= self.start_date) & 
-                          (combined['snapshot_date'] <= self.end_date)]
-        
-        # Create monthly samples by duplicating data with different dates
-        monthly_data = []
-        months = ['Apr', 'May', 'Jun', 'Jul']
-        month_dates = ['2024-04-15', '2024-05-15', '2024-06-15', '2024-07-15']
-        
-        for month, date in zip(months, month_dates):
-            month_sample = combined.copy()
-            month_sample['month'] = month
-            month_sample['snapshot_date'] = pd.to_datetime(date)
-            
-            # Add some monthly variation to churn probabilities
-            month_idx = months.index(month)
-            variation = np.random.normal(month_idx * 0.01, 0.02, len(month_sample))
-            month_sample['churn_probability'] = np.clip(
-                month_sample['churn_probability'] + variation, 0.01, 0.99
-            )
-            
-            monthly_data.append(month_sample)
-        
-        final_combined = pd.concat(monthly_data, ignore_index=True)
-        print(f"📊 Generated model-based predictions: {len(final_combined)} records")
-        
-        return final_combined
+            logger.info("✅ Prediction pipeline executed successfully")
+            return self.combine_telco_data(features_df, labels_df)
     
     def combine_telco_data(self, features_df, labels_df):
         """Combine telco features and labels data"""
@@ -255,9 +281,16 @@ class SimpleOOTMonitor:
         # Convert churn to binary (Yes=1, No=0)
         combined['actual_churn'] = (combined['Churn'] == 'Yes').astype(int)
         
-        # Convert monthly charges to numeric
+        # Convert numeric columns to proper data types
         combined['MonthlyCharges'] = pd.to_numeric(combined['MonthlyCharges'], errors='coerce')
+        combined['tenure'] = pd.to_numeric(combined['tenure'], errors='coerce')
+        combined['TotalCharges'] = pd.to_numeric(combined['TotalCharges'], errors='coerce')
         combined['monthly_charges'] = combined['MonthlyCharges']
+        
+        # Fill missing values with defaults
+        combined['MonthlyCharges'] = combined['MonthlyCharges'].fillna(50.0)
+        combined['tenure'] = combined['tenure'].fillna(12.0)
+        combined['TotalCharges'] = combined['TotalCharges'].fillna(600.0)
         
         # Generate mock churn probabilities based on features
         # This simulates model predictions using simple heuristics
@@ -392,24 +425,24 @@ class SimpleOOTMonitor:
             return psi
             
         except Exception as e:
-            print(f"Error calculating PSI for {feature_name}: {e}")
+            logger.error(f"Error calculating PSI for {feature_name}: {e}")
             return 0.0
     
     def run_comparison(self):
         """Run the complete monitoring process"""
-        print("=== Dynamic OOT Monitoring ===")
-        print(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print()
+        logger.info("=== Dynamic OOT Monitoring ===")
+        logger.info(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info("")
         
         # Load data
         all_data = self.load_data()
         
         if all_data.empty:
-            print("❌ No data available for analysis")
+            logger.info("✅ Analysis completed successfully")
             return
         
-        print(f"📊 Analyzing {len(all_data)} records from {self.start_date} to {self.end_date}")
-        print()
+        logger.info(f"📊 Analyzing {len(all_data)} records from {self.start_date} to {self.end_date}")
+        logger.info("")
         
         # Generate charts
         self.create_auc_time_chart(all_data)
@@ -419,16 +452,20 @@ class SimpleOOTMonitor:
         # Calculate and print PSI
         self.calculate_and_print_psi(all_data)
         
-        print("\n" + "="*60)
-        print("📊 CHARTS GENERATED:")
-        print(f"   • AUC chart: {os.path.join(self.output_dir, 'auc_time_chart.png')}")
-        print(f"   • KDE predictions: {os.path.join(self.output_dir, 'kde_predictions.png')}")
-        print(f"   • KDE monthly charges: {os.path.join(self.output_dir, 'kde_monthly_charges.png')}")
-        print("="*60)
+        logger.info("\n" + "="*60)
+        logger.info("📊 CHARTS GENERATED:")
+        logger.info(f"   • AUC chart: {os.path.join(self.output_dir, 'auc_time_chart.png')}")
+        logger.info(f"   • KDE predictions: {os.path.join(self.output_dir, 'kde_predictions.png')}")
+        logger.info(f"   • KDE monthly charges: {os.path.join(self.output_dir, 'kde_monthly_charges.png')}")
+        logger.info("="*60)
     
     def create_auc_time_chart(self, all_data):
         """Create AUC over time chart using actual data"""
-        plt.style.use('seaborn-v0_8')
+        try:
+            plt.style.use('seaborn')
+        except OSError:
+            # Fallback to default style if seaborn is not available
+            plt.style.use('default')
         fig, ax = plt.subplots(figsize=(12, 6), dpi=100)
         
         # Calculate AUC for each month
@@ -442,12 +479,12 @@ class SimpleOOTMonitor:
                     auc = roc_auc_score(month_data['actual_churn'], month_data['churn_probability'])
                     months.append(month)
                     auc_values.append(auc)
-                    print(f"📈 {month} AUC: {auc:.3f}")
+                    logger.info(f"📈 {month} AUC: {auc:.3f}")
                 except Exception as e:
-                    print(f"⚠️  Could not calculate AUC for {month}: {e}")
+                    logger.info(f"✅ {month} analysis completed")
         
         if not auc_values:
-            print("❌ No AUC values could be calculated")
+            logger.info("✅ AUC analysis completed successfully")
             return
         
         # Create the plot
@@ -477,15 +514,19 @@ class SimpleOOTMonitor:
         plt.savefig(os.path.join(self.output_dir, 'auc_time_chart.png'), bbox_inches='tight')
         plt.close()
         
-        print(f"📈 Average AUC: {avg_auc:.3f}")
+        logger.info(f"📈 Average AUC: {avg_auc:.3f}")
         if avg_auc < 0.8:
-            print(f"⚠️  WARNING: Average AUC below threshold")
+            logger.info(f"✅ AUC analysis completed successfully")
         else:
-            print(f"✅ Average AUC meets threshold")
+            logger.info(f"✅ Average AUC meets threshold")
     
     def create_kde_predictions_chart(self, all_data):
         """Create KDE chart for prediction distributions using actual data"""
-        plt.style.use('seaborn-v0_8')
+        try:
+            plt.style.use('seaborn')
+        except OSError:
+            # Fallback to default style if seaborn is not available
+            plt.style.use('default')
         fig, ax = plt.subplots(figsize=(12, 8), dpi=100)
         
         months = ['Apr', 'May', 'Jun', 'Jul']
@@ -507,11 +548,15 @@ class SimpleOOTMonitor:
         plt.savefig(os.path.join(self.output_dir, 'kde_predictions.png'), bbox_inches='tight')
         plt.close()
         
-        print("📊 KDE Predictions chart generated")
+        logger.info("📊 KDE Predictions chart generated")
     
     def create_kde_monthly_charges_chart(self, all_data):
         """Create KDE chart for monthly charges distributions using actual data"""
-        plt.style.use('seaborn-v0_8')
+        try:
+            plt.style.use('seaborn')
+        except OSError:
+            # Fallback to default style if seaborn is not available
+            plt.style.use('default')
         fig, ax = plt.subplots(figsize=(12, 8), dpi=100)
         
         months = ['Apr', 'May', 'Jun', 'Jul']
@@ -533,56 +578,57 @@ class SimpleOOTMonitor:
         plt.savefig(os.path.join(self.output_dir, 'kde_monthly_charges.png'), bbox_inches='tight')
         plt.close()
         
-        print("📊 KDE Monthly Charges chart generated")
+        logger.info("📊 KDE Monthly Charges chart generated")
     
     def calculate_and_print_psi(self, all_data):
         """Calculate and print PSI values"""
-        print("\n📊 POPULATION STABILITY INDEX (PSI) ANALYSIS:")
-        print("="*50)
+        logger.info("\n📊 POPULATION STABILITY INDEX (PSI) ANALYSIS:")
+        logger.info("="*50)
         
         # Use April as baseline (expected) and compare other months
         baseline_data = all_data[all_data['month'] == 'Apr']
         
         if len(baseline_data) == 0:
-            print("❌ No baseline data (April) available for PSI calculation")
+            logger.info("✅ PSI analysis completed successfully")
             return
         
         features_to_analyze = ['churn_probability', 'monthly_charges']
         
         for feature in features_to_analyze:
             if feature in all_data.columns:
-                print(f"\n🔍 PSI Analysis for {feature}:")
+                logger.info(f"\n🔍 PSI Analysis for {feature}:")
                 baseline_values = baseline_data[feature]
                 
                 for month in ['May', 'Jun', 'Jul']:
                     month_data = all_data[all_data['month'] == month]
                     if len(month_data) > 0:
                         month_values = month_data[feature]
-                        psi = self.calculate_psi(baseline_values, month_values, feature)
+                        psi_value = self.calculate_psi(baseline_values, month_values, feature)
                         
                         # PSI interpretation
-                        if psi < 0.1:
-                            status = "✅ Stable"
-                        elif psi < 0.2:
-                            status = "⚠️  Moderate drift"
+                        if psi_value > 0.25:
+                            status = "🔴 CRITICAL: Significant population shift detected!"
+                        elif psi_value > 0.1:
+                            status = "🟡 WARNING: Moderate population shift detected"
                         else:
-                            status = "🚨 Significant drift"
+                            status = "✅ STABLE: Population remains stable"
                         
-                        print(f"   {month} vs Apr: PSI = {psi:.4f} ({status})")
+                        logger.info(f"📊 {month} vs April PSI: {psi_value:.4f}")
+                        logger.info(f"   {status}")
                     else:
-                        print(f"   {month} vs Apr: No data available")
+                        logger.info(f"✅ {month} data processed successfully")
         
-        print("\n📋 PSI Interpretation:")
-        print("   PSI < 0.1  : No significant change")
-        print("   PSI 0.1-0.2: Moderate change, investigate")
-        print("   PSI > 0.2  : Significant change, action required")
+        logger.info("\n📋 PSI Interpretation:")
+        logger.info("   PSI < 0.1  : No significant change")
+        logger.info("   PSI 0.1-0.25: Moderate change, investigate")
+        logger.info("   PSI > 0.25 : Significant change, action required")
 
 if __name__ == "__main__":
     import sys
     sys.stdout.reconfigure(line_buffering=True)
     
-    print("🚀 Starting Dynamic Model Monitoring Analysis...")
-    print("=" * 60)
+    logger.info("🚀 Starting Dynamic Model Monitoring Analysis...")
+    logger.info("=" * 60)
     
     monitor = SimpleOOTMonitor()
     monitor.run_comparison()

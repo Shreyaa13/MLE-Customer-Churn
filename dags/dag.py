@@ -1,6 +1,6 @@
 from airflow import DAG
 from airflow.operators.bash import BashOperator
-from airflow.operators.dummy import DummyOperator
+from airflow.operators.empty import EmptyOperator
 from datetime import datetime, timedelta
 
 default_args = {
@@ -151,7 +151,7 @@ with DAG(
 
 
     # --- model inference ---
-    model_inference_start = DummyOperator(task_id="model_inference_start")
+    model_inference_start = EmptyOperator(task_id="model_inference_start")
 
     model_1_inference = BashOperator(
         task_id='xgb_inference',
@@ -165,7 +165,7 @@ with DAG(
 
     
     
-    model_inference_completed = DummyOperator(task_id="model_inference_completed")
+    model_inference_completed = EmptyOperator(task_id="model_inference_completed")
     
     # Define task dependencies to run scripts sequentially
     feature_store_completed >> model_inference_start
@@ -173,12 +173,18 @@ with DAG(
 
 
     # --- model monitoring ---
-    model_monitor_start = DummyOperator(task_id="model_monitor_start")
+    model_monitor_start = EmptyOperator(task_id="model_monitor_start")
 
-    model_1_monitor = DummyOperator(task_id="xgb_monitor")
+    model_1_monitor = BashOperator(
+        task_id='xgb_monitor',
+        bash_command=(
+            'cd /opt/airflow && '
+            'python3 /opt/airflow/monitor.py'
+        ),
+    )
 
 
-    model_monitor_completed = DummyOperator(task_id="model_monitor_completed")
+    model_monitor_completed = EmptyOperator(task_id="model_monitor_completed")
     
     # Define task dependencies to run scripts sequentially
     model_inference_completed >> model_monitor_start
@@ -187,7 +193,7 @@ with DAG(
 
     # --- model auto training ---
 
-    model_automl_start = DummyOperator(task_id="model_automl_start")
+    model_automl_start = EmptyOperator(task_id="model_automl_start")
     
 
     model_1_automl = BashOperator(
@@ -199,7 +205,7 @@ with DAG(
         ),
     )
 
-    model_automl_completed = DummyOperator(task_id="model_automl_completed")
+    model_automl_completed = EmptyOperator(task_id="model_automl_completed")
     
     # Define task dependencies to run scripts sequentially
     feature_store_completed >> model_automl_start
