@@ -489,7 +489,7 @@ class SimpleOOTMonitor:
         
         # Create the plot
         ax.plot(months, auc_values, marker='o', linewidth=3, markersize=8, color='#2E86AB')
-        ax.axhline(y=0.8, color='#F24236', linestyle='--', alpha=0.7, label='Threshold (0.8)')
+        ax.axhline(y=0.65, color='#F24236', linestyle='--', alpha=0.7, label='Threshold (0.65)')
         
         # Styling
         ax.set_title('Model Performance Over Time (Dynamic)', fontsize=16, fontweight='bold', pad=20)
