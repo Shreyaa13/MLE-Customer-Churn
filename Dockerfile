@@ -12,9 +12,10 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends openjdk-17-jdk-headless procps bash && \
     rm -rf /var/lib/apt/lists/* && \
     ln -sf /bin/bash /bin/sh && \
-    mkdir -p /usr/lib/jvm/java-17-openjdk-amd64/bin && \
-    ln -sf $(which java) /usr/lib/jvm/java-17-openjdk-amd64/bin/java && \
-    ln -sf $(which javac) /usr/lib/jvm/java-17-openjdk-amd64/bin/javac
+    mkdir -p /usr/lib/jvm/java-17-openjdk-amd64/bin
+    #  && \
+    # ln -sf $(which java) /usr/lib/jvm/java-17-openjdk-amd64/bin/java && \
+    # ln -sf $(which javac) /usr/lib/jvm/java-17-openjdk-amd64/bin/javac
 
 # Set JAVA_HOME and Spark environment variables
 ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
